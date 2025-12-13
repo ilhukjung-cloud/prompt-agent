@@ -3,6 +3,7 @@ import { SYSTEM_PROMPT, PHASE_PROMPTS } from '../config/systemPrompt';
 
 let genAI = null;
 let chatSession = null;
+let currentSystemPrompt = '';
 
 export const initializeGemini = (apiKey) => {
   genAI = new GoogleGenerativeAI(apiKey);
@@ -17,9 +18,16 @@ export const startNewChat = (phase = 'diagnosis') => {
     initializeGemini(apiKey);
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-
   const phaseInstruction = PHASE_PROMPTS[phase] || '';
+  currentSystemPrompt = `${SYSTEM_PROMPT}\n\n${phaseInstruction}`;
+
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-1.5-pro',
+    systemInstruction: {
+      role: 'user',
+      parts: [{ text: currentSystemPrompt }],
+    },
+  });
 
   chatSession = model.startChat({
     history: [],
@@ -29,7 +37,6 @@ export const startNewChat = (phase = 'diagnosis') => {
       topK: 40,
       maxOutputTokens: 8192,
     },
-    systemInstruction: `${SYSTEM_PROMPT}\n\n${phaseInstruction}`,
   });
 
   return chatSession;
@@ -40,11 +47,19 @@ export const updatePhase = (phase) => {
     throw new Error('Gemini가 초기화되지 않았습니다.');
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
   const phaseInstruction = PHASE_PROMPTS[phase] || '';
+  currentSystemPrompt = `${SYSTEM_PROMPT}\n\n${phaseInstruction}`;
 
-  // 기존 히스토리 유지하면서 새 phase로 전환
+  // 기존 히스토리 가져오기
   const currentHistory = chatSession?._history || [];
+
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-1.5-pro',
+    systemInstruction: {
+      role: 'user',
+      parts: [{ text: currentSystemPrompt }],
+    },
+  });
 
   chatSession = model.startChat({
     history: currentHistory,
@@ -54,7 +69,6 @@ export const updatePhase = (phase) => {
       topK: 40,
       maxOutputTokens: 8192,
     },
-    systemInstruction: `${SYSTEM_PROMPT}\n\n${phaseInstruction}`,
   });
 
   return chatSession;
