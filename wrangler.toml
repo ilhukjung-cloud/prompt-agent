@@ -1,0 +1,7 @@
+# Cloudflare Pages configuration
+name = "prompt-agent"
+compatibility_date = "2024-01-01"
+
+[vars]
+# Environment variables can be set in Cloudflare Dashboard
+# VITE_GEMINI_API_KEY = "your-api-key-here"
