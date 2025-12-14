@@ -1045,3 +1045,116 @@ body {
   background: rgba(255, 255, 255, 0.2);
   color: white;
 }
+
+/* Image Generation Styles */
+.generate-image-btn {
+  background: linear-gradient(135deg, #FF6B35, #FF8C42) !important;
+  color: white !important;
+  border: none !important;
+  font-weight: 500;
+}
+
+.generate-image-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #E55A2B, #E67A35) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+}
+
+.generate-image-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.generation-progress {
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #E8F4FD, #D4E9FC);
+  border-left: 3px solid var(--primary-color);
+  font-size: 0.85rem;
+  color: var(--primary-color);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  border-radius: 0 4px 4px 0;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.generated-image-container {
+  margin-top: 1rem;
+  border-top: 2px solid var(--border-color);
+  padding-top: 1rem;
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.generated-image-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0 0.5rem;
+}
+
+.generated-image-header span {
+  font-weight: 600;
+  color: var(--primary-color);
+  font-size: 0.9rem;
+}
+
+.download-image-btn {
+  background: var(--success-color) !important;
+  color: white !important;
+  border: none !important;
+  padding: 0.4rem 0.75rem !important;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.download-image-btn:hover {
+  background: #218838 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.generated-image {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  transition: transform 0.2s;
+}
+
+.generated-image:hover {
+  transform: scale(1.02);
+  cursor: pointer;
+}
+
+.generated-image-text {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-color);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.generated-image-text p {
+  margin: 0;
+}
