@@ -3,7 +3,8 @@ import PhaseIndicator from './components/PhaseIndicator';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import PromptOutput from './components/PromptOutput';
-import { startNewChat, sendMessageStream, updatePhase } from './services/geminiService';
+import FileUpload from './components/FileUpload';
+import { startNewChat, sendMessageStream, sendMessageWithFiles, updatePhase } from './services/geminiService';
 import './App.css';
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
   const [generatedPrompts, setGeneratedPrompts] = useState([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState(null);
+  const [pendingFiles, setPendingFiles] = useState([]);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -40,8 +42,67 @@ function App() {
     }
   };
 
+  // 파일 분석 처리
+  const handleFileAnalyzed = async (files) => {
+    if (!isInitialized) {
+      // 초기화되지 않은 경우, 파일을 대기 상태로 저장
+      setPendingFiles(files);
+      return;
+    }
+
+    // 파일과 함께 분석 요청
+    await handleSendMessageWithFiles('첨부된 파일을 분석해주세요.', files);
+  };
+
+  // 파일과 함께 메시지 전송
+  const handleSendMessageWithFiles = async (message, files) => {
+    if (!message.trim() && files.length === 0) return;
+
+    // 사용자 메시지 추가 (파일 정보 포함)
+    const fileNames = files.map((f) => f.name).join(', ');
+    const userMessage = {
+      role: 'user',
+      content: message,
+      files: fileNames,
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+    setStreamingMessage('');
+
+    try {
+      let fullResponse = '';
+
+      await sendMessageWithFiles(message, files, (chunk, full) => {
+        setStreamingMessage(full);
+        fullResponse = full;
+      });
+
+      // 스트리밍 완료 후 메시지 추가
+      setMessages((prev) => [...prev, { role: 'assistant', content: fullResponse }]);
+      setStreamingMessage('');
+
+      // 프롬프트 생성 단계에서 프롬프트 추출
+      if (currentPhase === 'promptGeneration') {
+        extractPrompts(fullResponse);
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Failed to send message with files:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSendMessage = async (message, isInit = false) => {
     if (!message.trim()) return;
+
+    // 대기 중인 파일이 있으면 함께 전송
+    if (pendingFiles.length > 0) {
+      const files = pendingFiles;
+      setPendingFiles([]);
+      await handleSendMessageWithFiles(message, files);
+      return;
+    }
 
     // 사용자 메시지 추가
     const userMessage = { role: 'user', content: message };
@@ -139,10 +200,16 @@ function App() {
     setGeneratedPrompts([]);
     setIsInitialized(false);
     setError(null);
+    setPendingFiles([]);
   };
 
   const getPlaceholder = () => {
-    if (!isInitialized) return '보고서 주제를 입력하세요 (예: 사내 보안 강화 방안)';
+    if (!isInitialized) {
+      if (pendingFiles.length > 0) {
+        return `${pendingFiles.length}개 파일이 첨부됨 - 보고서 주제를 입력하세요`;
+      }
+      return '보고서 주제를 입력하세요 (예: 사내 보안 강화 방안)';
+    }
 
     const placeholders = {
       diagnosis: '질문에 답변해주세요...',
@@ -205,11 +272,27 @@ function App() {
                     <span>프롬프트</span>
                   </div>
                 </div>
+
+                {/* 파일 업로드 영역 */}
+                <div className="file-upload-section">
+                  <FileUpload
+                    onFileAnalyzed={(files) => setPendingFiles(files)}
+                    disabled={isLoading}
+                  />
+                  {pendingFiles.length > 0 && (
+                    <div className="pending-files-notice">
+                      <span>📎 {pendingFiles.length}개 파일 첨부됨</span>
+                      <span className="pending-files-hint">
+                        아래에 보고서 주제를 입력하면 파일과 함께 분석됩니다
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
             <div className="messages-container">
-              {messages.map((msg, index) => (
+              {messages.map((msg, index) =>
                 msg.role === 'system' ? (
                   <div key={index} className="system-message">
                     {msg.content}
@@ -219,9 +302,10 @@ function App() {
                     key={index}
                     message={msg.content}
                     isUser={msg.role === 'user'}
+                    files={msg.files}
                   />
                 )
-              ))}
+              )}
               {streamingMessage && (
                 <ChatMessage
                   message={streamingMessage}
@@ -244,6 +328,16 @@ function App() {
             <div className="error-message">
               <span>⚠️ {error}</span>
               <button onClick={() => setError(null)}>닫기</button>
+            </div>
+          )}
+
+          {/* 대화 중 파일 업로드 */}
+          {isInitialized && (
+            <div className="inline-file-upload">
+              <FileUpload
+                onFileAnalyzed={handleFileAnalyzed}
+                disabled={isLoading}
+              />
             </div>
           )}
 

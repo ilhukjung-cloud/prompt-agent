@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ChatMessage = ({ message, isUser, isStreaming }) => {
+const ChatMessage = ({ message, isUser, isStreaming, files }) => {
   // 마크다운 코드 블록을 감지하고 스타일링
   const formatMessage = (text) => {
     if (!text) return '';
@@ -58,6 +58,12 @@ const ChatMessage = ({ message, isUser, isStreaming }) => {
         {isUser ? '👤' : '🤖'}
       </div>
       <div className="message-content">
+        {files && (
+          <div className="message-files">
+            <span className="message-files-icon">📎</span>
+            <span>{files}</span>
+          </div>
+        )}
         <div className="message-text">
           {formatMessage(message)}
         </div>
