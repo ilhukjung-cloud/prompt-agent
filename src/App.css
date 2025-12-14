@@ -896,3 +896,152 @@ body {
   background: rgba(255, 255, 255, 0.2);
   color: white;
 }
+
+/* Action Items Box - 해야 할 일 하이라이트 */
+.action-items-box {
+  background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+  border: 2px solid #FF9800;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.2);
+}
+
+.action-items-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #E65100;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.action-icon {
+  font-size: 1.25rem;
+}
+
+.action-items-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.action-items-list li {
+  position: relative;
+  padding: 0.5rem 0 0.5rem 1.5rem;
+  font-size: 0.95rem;
+  color: #333;
+  line-height: 1.5;
+  border-bottom: 1px dashed rgba(255, 152, 0, 0.2);
+}
+
+.action-items-list li:last-child {
+  border-bottom: none;
+}
+
+.action-items-list li::before {
+  content: '▶';
+  position: absolute;
+  left: 0;
+  color: #FF9800;
+  font-size: 0.75rem;
+}
+
+/* Markdown Styles */
+.message-text .md-h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 1.5rem 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--primary-color);
+  color: var(--primary-color);
+}
+
+.message-text .md-h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.75rem;
+  color: var(--text-primary);
+}
+
+.message-text .md-h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+  color: var(--text-primary);
+}
+
+.message-text .md-ul,
+.message-text .md-ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+
+.message-text .md-li {
+  margin: 0.4rem 0;
+  line-height: 1.6;
+}
+
+.message-text .md-blockquote {
+  border-left: 4px solid var(--primary-color);
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 102, 204, 0.05);
+  border-radius: 0 8px 8px 0;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.message-text .md-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.message-text .md-table th,
+.message-text .md-table td {
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.message-text .md-table th {
+  background: var(--bg-color);
+  font-weight: 600;
+}
+
+.message-text p {
+  margin: 0.75rem 0;
+}
+
+.message-text strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.message-text em {
+  font-style: italic;
+}
+
+/* User message overrides */
+.chat-message.user .message-text .md-h1,
+.chat-message.user .message-text .md-h2,
+.chat-message.user .message-text .md-h3,
+.chat-message.user .message-text strong {
+  color: white;
+}
+
+.chat-message.user .message-text .md-blockquote {
+  border-left-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.chat-message.user .inline-code {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
