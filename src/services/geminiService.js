@@ -22,7 +22,7 @@ export const startNewChat = (phase = 'diagnosis') => {
   currentSystemPrompt = `${SYSTEM_PROMPT}\n\n${phaseInstruction}`;
 
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-pro-preview-06-05',
+    model: 'gemini-3-pro-preview',
     systemInstruction: {
       role: 'user',
       parts: [{ text: currentSystemPrompt }],
@@ -54,7 +54,7 @@ export const updatePhase = (phase) => {
   const currentHistory = chatSession?._history || [];
 
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-pro-preview-06-05',
+    model: 'gemini-3-pro-preview',
     systemInstruction: {
       role: 'user',
       parts: [{ text: currentSystemPrompt }],
