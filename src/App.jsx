@@ -4,7 +4,7 @@ import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
 import PromptOutput from './components/PromptOutput';
 import FileUpload from './components/FileUpload';
-import { startNewChat, sendMessageStream, sendMessageWithFiles, updatePhase } from './services/geminiService';
+import { startNewChat, sendMessageWithHistory, sendMessageWithFiles } from './services/geminiService';
 import './App.css';
 
 function App() {
@@ -31,7 +31,7 @@ function App() {
   const initializeChat = async (topic) => {
     try {
       setError(null);
-      startNewChat('diagnosis');
+      startNewChat();
       setIsInitialized(true);
 
       // 첫 메시지로 주제 전송
@@ -45,43 +45,41 @@ function App() {
   // 파일 분석 처리
   const handleFileAnalyzed = async (files) => {
     if (!isInitialized) {
-      // 초기화되지 않은 경우, 파일을 대기 상태로 저장
       setPendingFiles(files);
       return;
     }
 
-    // 파일과 함께 분석 요청
-    await handleSendMessageWithFiles('첨부된 파일을 분석해주세요.', files);
+    await handleSendMessageWithFilesInternal('첨부된 파일을 분석해주세요.', files);
   };
 
   // 파일과 함께 메시지 전송
-  const handleSendMessageWithFiles = async (message, files) => {
+  const handleSendMessageWithFilesInternal = async (message, files) => {
     if (!message.trim() && files.length === 0) return;
 
-    // 사용자 메시지 추가 (파일 정보 포함)
     const fileNames = files.map((f) => f.name).join(', ');
     const userMessage = {
       role: 'user',
       content: message,
       files: fileNames,
     };
-    setMessages((prev) => [...prev, userMessage]);
+
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setIsLoading(true);
     setStreamingMessage('');
 
     try {
       let fullResponse = '';
 
-      await sendMessageWithFiles(message, files, (chunk, full) => {
+      // 히스토리를 직접 전달
+      await sendMessageWithFiles(message, files, messages, (chunk, full) => {
         setStreamingMessage(full);
         fullResponse = full;
       });
 
-      // 스트리밍 완료 후 메시지 추가
       setMessages((prev) => [...prev, { role: 'assistant', content: fullResponse }]);
       setStreamingMessage('');
 
-      // 프롬프트 생성 단계에서 프롬프트 추출
       if (currentPhase === 'promptGeneration') {
         extractPrompts(fullResponse);
       }
@@ -100,29 +98,28 @@ function App() {
     if (pendingFiles.length > 0) {
       const files = pendingFiles;
       setPendingFiles([]);
-      await handleSendMessageWithFiles(message, files);
+      await handleSendMessageWithFilesInternal(message, files);
       return;
     }
 
-    // 사용자 메시지 추가
     const userMessage = { role: 'user', content: message };
-    setMessages((prev) => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setIsLoading(true);
     setStreamingMessage('');
 
     try {
       let fullResponse = '';
 
-      await sendMessageStream(message, (chunk, full) => {
+      // 히스토리를 직접 전달 (현재 메시지 제외한 이전 히스토리)
+      await sendMessageWithHistory(message, messages, (chunk, full) => {
         setStreamingMessage(full);
         fullResponse = full;
       });
 
-      // 스트리밍 완료 후 메시지 추가
       setMessages((prev) => [...prev, { role: 'assistant', content: fullResponse }]);
       setStreamingMessage('');
 
-      // 프롬프트 생성 단계에서 프롬프트 추출
       if (currentPhase === 'promptGeneration') {
         extractPrompts(fullResponse);
       }
@@ -135,7 +132,6 @@ function App() {
   };
 
   const extractPrompts = (text) => {
-    // 코드 블록에서 프롬프트 추출
     const codeBlockRegex = /```(?:\w*\n)?([\s\S]*?)```/g;
     const matches = [...text.matchAll(codeBlockRegex)];
 
@@ -145,7 +141,6 @@ function App() {
         content: match[1].trim(),
       }));
 
-      // [Slide Title] 패턴에서 제목 추출 시도
       newPrompts.forEach((prompt) => {
         const titleMatch = prompt.content.match(/\[Slide Title\]:\s*(.+)/);
         if (titleMatch) {
@@ -160,7 +155,6 @@ function App() {
   const handlePhaseChange = async (newPhase) => {
     if (newPhase === currentPhase) return;
 
-    // 현재 단계 완료로 표시
     if (!completedPhases.includes(currentPhase)) {
       setCompletedPhases((prev) => [...prev, currentPhase]);
     }
@@ -173,29 +167,29 @@ function App() {
     };
 
     setCurrentPhase(newPhase);
-    updatePhase(newPhase);
 
-    // 단계 변경 메시지 추가
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: 'system',
-        content: `--- ${phaseNames[newPhase]} 단계로 이동합니다 ---`,
-      },
-    ]);
+    // 시스템 메시지 추가
+    const systemMessage = {
+      role: 'system',
+      content: `--- ${phaseNames[newPhase]} 단계로 이동합니다 ---`,
+    };
 
-    // Phase 전환 시 AI에게 컨텍스트 전달하여 이어서 진행하도록 함
+    const updatedMessages = [...messages, systemMessage];
+    setMessages(updatedMessages);
+
+    // Phase 전환 시 AI에게 요청
     setIsLoading(true);
     setStreamingMessage('');
 
     try {
       let fullResponse = '';
-      const phaseMessage = `${phaseNames[newPhase]} 단계를 시작해주세요. 이전 대화 내용을 바탕으로 이어서 진행해주세요.`;
+      const phaseMessage = `[Phase 전환] 이제 ${phaseNames[newPhase]} 단계입니다. 위의 모든 대화 내용을 바탕으로 ${phaseNames[newPhase]} 단계를 진행해주세요.`;
 
-      await sendMessageStream(phaseMessage, (chunk, full) => {
+      // 업데이트된 메시지 히스토리를 직접 전달
+      await sendMessageWithHistory(phaseMessage, updatedMessages, (chunk, full) => {
         setStreamingMessage(full);
         fullResponse = full;
-      }, phaseNames[newPhase]);
+      });
 
       setMessages((prev) => [...prev, { role: 'assistant', content: fullResponse }]);
       setStreamingMessage('');
@@ -299,7 +293,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* 파일 업로드 영역 */}
                 <div className="file-upload-section">
                   <FileUpload
                     onFileAnalyzed={(files) => setPendingFiles(files)}
@@ -357,7 +350,6 @@ function App() {
             </div>
           )}
 
-          {/* 대화 중 파일 업로드 */}
           {isInitialized && (
             <div className="inline-file-upload">
               <FileUpload

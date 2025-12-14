@@ -1,15 +1,31 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { SYSTEM_PROMPT, PHASE_PROMPTS } from '../config/systemPrompt';
+import { SYSTEM_PROMPT } from '../config/systemPrompt';
 
 let genAI = null;
-let chatSession = null;
-let currentPhase = 'diagnosis';
+let model = null;
 
 export const initializeGemini = (apiKey) => {
   genAI = new GoogleGenerativeAI(apiKey);
+  model = genAI.getGenerativeModel({
+    model: 'gemini-3-pro-preview',
+    systemInstruction: {
+      role: 'user',
+      parts: [{ text: SYSTEM_PROMPT }],
+    },
+  });
 };
 
-export const startNewChat = (phase = 'diagnosis') => {
+// 히스토리를 Gemini 형식으로 변환
+const convertToGeminiHistory = (messages) => {
+  return messages
+    .filter((msg) => msg.role !== 'system') // 시스템 메시지 제외
+    .map((msg) => ({
+      role: msg.role === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.content }],
+    }));
+};
+
+export const startNewChat = () => {
   if (!genAI) {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
@@ -17,81 +33,27 @@ export const startNewChat = (phase = 'diagnosis') => {
     }
     initializeGemini(apiKey);
   }
-
-  currentPhase = phase;
-
-  // 전체 시스템 프롬프트 (모든 Phase 정보 포함)
-  const fullSystemPrompt = `${SYSTEM_PROMPT}
-
-[IMPORTANT: Phase Management]
-- 현재 Phase: ${phase}
-- Phase는 순차적으로 진행됩니다: diagnosis → structuring → detailing → promptGeneration
-- 각 Phase가 완료되면 사용자 승인을 받고 다음 Phase로 자연스럽게 넘어가세요.
-- 절대로 이전 Phase로 돌아가지 마세요. 이미 완료된 진단 내용을 다시 묻지 마세요.
-- 사용자가 "좋아요", "승인", "다음" 등으로 답하면 현재 Phase를 완료 처리하고 다음으로 진행하세요.
-
-${PHASE_PROMPTS[phase]}`;
-
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-3-pro-preview',
-    systemInstruction: {
-      role: 'user',
-      parts: [{ text: fullSystemPrompt }],
-    },
-  });
-
-  chatSession = model.startChat({
-    history: [],
-    generationConfig: {
-      temperature: 1,
-      topP: 0.95,
-      topK: 64,
-      maxOutputTokens: 65536,
-    },
-  });
-
-  return chatSession;
 };
 
-export const updatePhase = (newPhase) => {
-  // Phase만 업데이트하고 세션은 유지
-  // 다음 메시지에서 Phase 전환 컨텍스트를 추가
-  currentPhase = newPhase;
-  return chatSession;
-};
-
-export const getCurrentPhase = () => currentPhase;
-
-export const sendMessage = async (message) => {
-  if (!chatSession) {
-    throw new Error('채팅 세션이 시작되지 않았습니다.');
+// 히스토리 기반 메시지 전송 (스트리밍)
+export const sendMessageWithHistory = async (message, history, onChunk) => {
+  if (!model) {
+    startNewChat();
   }
 
   try {
-    const result = await chatSession.sendMessage(message);
-    const response = await result.response;
-    return response.text();
-  } catch (error) {
-    console.error('Gemini API Error:', error);
-    throw error;
-  }
-};
+    // 매번 새 채팅 세션을 히스토리와 함께 생성
+    const chatSession = model.startChat({
+      history: convertToGeminiHistory(history),
+      generationConfig: {
+        temperature: 1,
+        topP: 0.95,
+        topK: 64,
+        maxOutputTokens: 65536,
+      },
+    });
 
-export const sendMessageStream = async (message, onChunk, phaseContext = null) => {
-  if (!chatSession) {
-    throw new Error('채팅 세션이 시작되지 않았습니다.');
-  }
-
-  try {
-    // Phase 전환 컨텍스트가 있으면 메시지에 추가
-    let finalMessage = message;
-    if (phaseContext) {
-      finalMessage = `[System: Phase 전환 - 현재 ${phaseContext} 단계입니다. 이전 대화 내용을 기억하고 이어서 진행하세요. 절대 Phase 1부터 다시 시작하지 마세요.]
-
-사용자 메시지: ${message}`;
-    }
-
-    const result = await chatSession.sendMessageStream(finalMessage);
+    const result = await chatSession.sendMessageStream(message);
     let fullText = '';
 
     for await (const chunk of result.stream) {
@@ -108,12 +70,23 @@ export const sendMessageStream = async (message, onChunk, phaseContext = null) =
 };
 
 // 파일과 함께 메시지 전송 (멀티모달)
-export const sendMessageWithFiles = async (message, files, onChunk) => {
-  if (!chatSession) {
-    throw new Error('채팅 세션이 시작되지 않았습니다.');
+export const sendMessageWithFiles = async (message, files, history, onChunk) => {
+  if (!model) {
+    startNewChat();
   }
 
   try {
+    // 매번 새 채팅 세션을 히스토리와 함께 생성
+    const chatSession = model.startChat({
+      history: convertToGeminiHistory(history),
+      generationConfig: {
+        temperature: 1,
+        topP: 0.95,
+        topK: 64,
+        maxOutputTokens: 65536,
+      },
+    });
+
     // 멀티파트 콘텐츠 구성
     const parts = [];
 
@@ -163,8 +136,4 @@ export const sendMessageWithFiles = async (message, files, onChunk) => {
     console.error('Gemini API File Analysis Error:', error);
     throw error;
   }
-};
-
-export const getChatHistory = () => {
-  return chatSession?._history || [];
 };
