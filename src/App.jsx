@@ -157,7 +157,7 @@ function App() {
     }
   };
 
-  const handlePhaseChange = (newPhase) => {
+  const handlePhaseChange = async (newPhase) => {
     if (newPhase === currentPhase) return;
 
     // 현재 단계 완료로 표시
@@ -165,10 +165,6 @@ function App() {
       setCompletedPhases((prev) => [...prev, currentPhase]);
     }
 
-    setCurrentPhase(newPhase);
-    updatePhase(newPhase);
-
-    // 단계 변경 메시지 추가
     const phaseNames = {
       diagnosis: '진단',
       structuring: '구조화',
@@ -176,6 +172,10 @@ function App() {
       promptGeneration: '프롬프트 생성',
     };
 
+    setCurrentPhase(newPhase);
+    updatePhase(newPhase);
+
+    // 단계 변경 메시지 추가
     setMessages((prev) => [
       ...prev,
       {
@@ -183,6 +183,32 @@ function App() {
         content: `--- ${phaseNames[newPhase]} 단계로 이동합니다 ---`,
       },
     ]);
+
+    // Phase 전환 시 AI에게 컨텍스트 전달하여 이어서 진행하도록 함
+    setIsLoading(true);
+    setStreamingMessage('');
+
+    try {
+      let fullResponse = '';
+      const phaseMessage = `${phaseNames[newPhase]} 단계를 시작해주세요. 이전 대화 내용을 바탕으로 이어서 진행해주세요.`;
+
+      await sendMessageStream(phaseMessage, (chunk, full) => {
+        setStreamingMessage(full);
+        fullResponse = full;
+      }, phaseNames[newPhase]);
+
+      setMessages((prev) => [...prev, { role: 'assistant', content: fullResponse }]);
+      setStreamingMessage('');
+
+      if (newPhase === 'promptGeneration') {
+        extractPrompts(fullResponse);
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Failed to transition phase:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleNextPhase = () => {
