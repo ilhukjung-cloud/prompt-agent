@@ -33,7 +33,7 @@ export const startNewChat = (phase = 'diagnosis') => {
 ${PHASE_PROMPTS[phase]}`;
 
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3-pro-preview',
     systemInstruction: {
       role: 'user',
       parts: [{ text: fullSystemPrompt }],
