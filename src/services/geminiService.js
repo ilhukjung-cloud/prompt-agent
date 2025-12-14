@@ -22,7 +22,7 @@ export const startNewChat = (phase = 'diagnosis') => {
   currentSystemPrompt = `${SYSTEM_PROMPT}\n\n${phaseInstruction}`;
 
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-2.5-pro-preview-06-05',
     systemInstruction: {
       role: 'user',
       parts: [{ text: currentSystemPrompt }],
@@ -32,10 +32,13 @@ export const startNewChat = (phase = 'diagnosis') => {
   chatSession = model.startChat({
     history: [],
     generationConfig: {
-      temperature: 0.7,
-      topP: 0.9,
-      topK: 40,
-      maxOutputTokens: 8192,
+      temperature: 1,
+      topP: 0.95,
+      topK: 64,
+      maxOutputTokens: 65536,
+      thinkingConfig: {
+        thinkingBudget: 10000,
+      },
     },
   });
 
@@ -54,7 +57,7 @@ export const updatePhase = (phase) => {
   const currentHistory = chatSession?._history || [];
 
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-2.5-pro-preview-06-05',
     systemInstruction: {
       role: 'user',
       parts: [{ text: currentSystemPrompt }],
@@ -64,10 +67,13 @@ export const updatePhase = (phase) => {
   chatSession = model.startChat({
     history: currentHistory,
     generationConfig: {
-      temperature: 0.7,
-      topP: 0.9,
-      topK: 40,
-      maxOutputTokens: 8192,
+      temperature: 1,
+      topP: 0.95,
+      topK: 64,
+      maxOutputTokens: 65536,
+      thinkingConfig: {
+        thinkingBudget: 10000,
+      },
     },
   });
 
