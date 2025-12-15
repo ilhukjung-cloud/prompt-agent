@@ -17,6 +17,7 @@ function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState(null);
   const [pendingFiles, setPendingFiles] = useState([]);
+  const [draftMessage, setDraftMessage] = useState('');
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -67,6 +68,7 @@ function App() {
     setMessages(newMessages);
     setIsLoading(true);
     setStreamingMessage('');
+    setDraftMessage('');
 
     try {
       let fullResponse = '';
@@ -80,7 +82,7 @@ function App() {
       setMessages((prev) => [...prev, { role: 'assistant', content: fullResponse }]);
       setStreamingMessage('');
 
-      if (currentPhase === 'promptGeneration') {
+      if (currentPhase === 'promptGeneration' || containsSlideMarkers(fullResponse)) {
         extractPrompts(fullResponse);
       }
     } catch (err) {
@@ -107,6 +109,7 @@ function App() {
     setMessages(newMessages);
     setIsLoading(true);
     setStreamingMessage('');
+    setDraftMessage('');
 
     try {
       let fullResponse = '';
@@ -120,7 +123,7 @@ function App() {
       setMessages((prev) => [...prev, { role: 'assistant', content: fullResponse }]);
       setStreamingMessage('');
 
-      if (currentPhase === 'promptGeneration') {
+      if (currentPhase === 'promptGeneration' || containsSlideMarkers(fullResponse)) {
         extractPrompts(fullResponse);
       }
     } catch (err) {
@@ -131,30 +134,78 @@ function App() {
     }
   };
 
+  const containsSlideMarkers = (text) => {
+    const slideRegex = /(\[Slide Title\]|Slide\s*\d+|슬라이드\s*\d+)/i;
+    return slideRegex.test(text || '');
+  };
+
+  const optimizePromptContent = (content) => {
+    const cleaned = content.trim().replace(/\n{3,}/g, '\n\n');
+    const hasBranding = /Nano Banana Pro/i.test(cleaned);
+    const hasAspect = /16:9|16\s*x\s*9/i.test(cleaned);
+    const styleLines = [
+      'Style: Nano Banana Pro strategy deck, minimal Swiss typography, clean vector infographics, executive tone.',
+      'Rendering: photorealistic 3D, studio-grade lighting, subtle depth of field, ultra-detailed textures, 16:9 widescreen framing.',
+      'Color Palette: charcoal, cool gray, banana gold accents; avoid harsh saturation.',
+    ];
+
+    const suffix = [
+      !hasBranding ? styleLines[0] : null,
+      styleLines[1],
+      !hasAspect ? 'Ensure layout fits 16:9 slide canvas with generous margins.' : null,
+      styleLines[2],
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    return suffix ? `${cleaned}\n\n${suffix}` : cleaned;
+  };
+
   const extractPrompts = (text) => {
     const codeBlockRegex = /```(?:\w*\n)?([\s\S]*?)```/g;
     const matches = [...text.matchAll(codeBlockRegex)];
 
-    const newPrompts = (matches.length > 0
-      ? matches.map((match, index) => ({
-          title: `Slide ${generatedPrompts.length + index + 1}`,
-          content: match[1].trim(),
-        }))
-      : [
-          {
-            title: `Slide ${generatedPrompts.length + 1}`,
-            content: text.trim(),
-          },
-        ]);
+    const slideRegex = /(?:^|\n)(?:Slide|슬라이드)\s*(\d+)[.:\-\s]*(.*?)(?=\n(?:Slide|슬라이드)\s*\d+[.:\-\s]|$)/gis;
+    const slideMatches = [...text.matchAll(slideRegex)];
 
-    newPrompts.forEach((prompt) => {
-      const titleMatch = prompt.content.match(/\[Slide Title\]:\s*(.+)/);
+    const formattedPrompts = [];
+
+    if (matches.length > 0) {
+      matches.forEach((match, index) => {
+        formattedPrompts.push({
+          title: `Slide ${generatedPrompts.length + index + 1}`,
+          content: optimizePromptContent(match[1]),
+        });
+      });
+    } else if (slideMatches.length > 0) {
+      slideMatches.forEach((match) => {
+        const [, slideNumber, body] = match;
+        formattedPrompts.push({
+          title: `Slide ${slideNumber.trim()}`,
+          content: optimizePromptContent(body || text),
+        });
+      });
+    } else {
+      formattedPrompts.push({
+        title: `Slide ${generatedPrompts.length + 1}`,
+        content: optimizePromptContent(text),
+      });
+    }
+
+    formattedPrompts.forEach((prompt) => {
+      const titleMatch = prompt.content.match(/\[Slide Title\]:\s*(.+)/i);
       if (titleMatch) {
         prompt.title = titleMatch[1].trim();
       }
     });
 
-    setGeneratedPrompts((prev) => [...prev, ...newPrompts]);
+    const uniquePrompts = formattedPrompts.filter(
+      (prompt) => !generatedPrompts.some((existing) => existing.content === prompt.content)
+    );
+
+    if (uniquePrompts.length > 0) {
+      setGeneratedPrompts((prev) => [...prev, ...uniquePrompts]);
+    }
   };
 
   const handlePhaseChange = async (newPhase) => {
@@ -374,10 +425,51 @@ function App() {
                 다음 단계로 →
               </button>
             )}
+            {isInitialized && (
+              <div className="response-helper">
+                <div className="helper-heading">빠른 응답</div>
+                <div className="helper-actions">
+                  <button
+                    type="button"
+                    className="template-chip"
+                    disabled={isLoading}
+                    onClick={() => setDraftMessage((prev) => `${prev ? `${prev}\n` : ''}필요한 정보만 요약해 드렸습니다. 추가 질문 없이 바로 다음 단계를 진행해주세요.`)}
+                  >
+                    바로 진행 요청
+                  </button>
+                  <button
+                    type="button"
+                    className="template-chip"
+                    disabled={isLoading}
+                    onClick={() => setDraftMessage('추가 자료는 없습니다. 현재까지 내용으로 프롬프트를 최적화해 주세요. 필요 시 슬라이드별 핵심 메시지를 보강해 주세요.')}
+                  >
+                    추가 자료 없음
+                  </button>
+                  <button
+                    type="button"
+                    className="template-chip"
+                    disabled={isLoading}
+                    onClick={() => setDraftMessage('방금 생성한 프롬프트를 더 날카로운 스토리텔링(문제-해결-효과) 흐름으로 다듬고, 슬라이드별 제목과 비주얼 키워드를 정리해주세요.')}
+                  >
+                    프롬프트 다듬기
+                  </button>
+                  <button
+                    type="button"
+                    className="template-chip accent"
+                    disabled={isLoading}
+                    onClick={() => handlePhaseChange('promptGeneration')}
+                  >
+                    프롬프트 단계로 바로 이동
+                  </button>
+                </div>
+              </div>
+            )}
             <ChatInput
               onSend={isInitialized ? handleSendMessage : initializeChat}
               disabled={isLoading}
               placeholder={getPlaceholder()}
+              value={draftMessage}
+              onChange={setDraftMessage}
             />
           </div>
         </div>
