@@ -5,6 +5,7 @@ import ChatInput from './components/ChatInput';
 import PromptOutput from './components/PromptOutput';
 import FileUpload from './components/FileUpload';
 import { startNewChat, sendMessageWithHistory, sendMessageWithFiles } from './services/geminiService';
+import { PHASE_PROMPTS } from './config/systemPrompt';
 import './App.css';
 
 function App() {
@@ -32,10 +33,16 @@ function App() {
     try {
       setError(null);
       startNewChat();
+      const initialSystemMessage = {
+        role: 'system',
+        content: PHASE_PROMPTS[currentPhase],
+      };
+
+      setMessages([initialSystemMessage]);
       setIsInitialized(true);
 
       // 첫 메시지로 주제 전송
-      await handleSendMessage(topic, true);
+      await handleSendMessage(topic, true, [initialSystemMessage]);
     } catch (err) {
       setError(err.message);
       console.error('Failed to initialize chat:', err);
@@ -91,7 +98,7 @@ function App() {
     }
   };
 
-  const handleSendMessage = async (message, isInit = false) => {
+  const handleSendMessage = async (message, isInit = false, customHistory = null) => {
     if (!message.trim()) return;
 
     // 대기 중인 파일이 있으면 함께 전송
@@ -102,8 +109,9 @@ function App() {
       return;
     }
 
+    const history = customHistory ?? messages;
     const userMessage = { role: 'user', content: message };
-    const newMessages = [...messages, userMessage];
+    const newMessages = [...history, userMessage];
     setMessages(newMessages);
     setIsLoading(true);
     setStreamingMessage('');
@@ -112,7 +120,7 @@ function App() {
       let fullResponse = '';
 
       // 히스토리를 직접 전달 (현재 메시지 제외한 이전 히스토리)
-      await sendMessageWithHistory(message, messages, (chunk, full) => {
+      await sendMessageWithHistory(message, history, (chunk, full) => {
         setStreamingMessage(full);
         fullResponse = full;
       });
@@ -173,8 +181,12 @@ function App() {
       role: 'system',
       content: `--- ${phaseNames[newPhase]} 단계로 이동합니다 ---`,
     };
+    const phaseGuidanceMessage = {
+      role: 'system',
+      content: PHASE_PROMPTS[newPhase],
+    };
 
-    const updatedMessages = [...messages, systemMessage];
+    const updatedMessages = [...messages, systemMessage, phaseGuidanceMessage];
     setMessages(updatedMessages);
 
     // Phase 전환 시 AI에게 요청
@@ -183,7 +195,7 @@ function App() {
 
     try {
       let fullResponse = '';
-      const phaseMessage = `[Phase 전환] 이제 ${phaseNames[newPhase]} 단계입니다. 위의 모든 대화 내용을 바탕으로 ${phaseNames[newPhase]} 단계를 진행해주세요.`;
+      const phaseMessage = `${PHASE_PROMPTS[newPhase]}\n\n[Phase 전환] 이제 ${phaseNames[newPhase]} 단계입니다. 위의 모든 대화 내용을 바탕으로 ${phaseNames[newPhase]} 단계의 요구사항에 맞게 진행해주세요.`;
 
       // 업데이트된 메시지 히스토리를 직접 전달
       await sendMessageWithHistory(phaseMessage, updatedMessages, (chunk, full) => {

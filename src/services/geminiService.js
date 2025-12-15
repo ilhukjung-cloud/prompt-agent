@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { SYSTEM_PROMPT } from '../config/systemPrompt';
+import { SYSTEM_PROMPT } from '../config/systemPrompt.js';
 
 let genAI = null;
 let model = null;
@@ -16,13 +16,11 @@ export const initializeGemini = (apiKey) => {
 };
 
 // 히스토리를 Gemini 형식으로 변환
-const convertToGeminiHistory = (messages) => {
-  return messages
-    .filter((msg) => msg.role !== 'system') // 시스템 메시지 제외
-    .map((msg) => ({
-      role: msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.content }],
-    }));
+export const convertToGeminiHistory = (messages) => {
+  return messages.map((msg) => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }],
+  }));
 };
 
 export const startNewChat = () => {
