@@ -135,21 +135,26 @@ function App() {
     const codeBlockRegex = /```(?:\w*\n)?([\s\S]*?)```/g;
     const matches = [...text.matchAll(codeBlockRegex)];
 
-    if (matches.length > 0) {
-      const newPrompts = matches.map((match, index) => ({
-        title: `Slide ${generatedPrompts.length + index + 1}`,
-        content: match[1].trim(),
-      }));
+    const newPrompts = (matches.length > 0
+      ? matches.map((match, index) => ({
+          title: `Slide ${generatedPrompts.length + index + 1}`,
+          content: match[1].trim(),
+        }))
+      : [
+          {
+            title: `Slide ${generatedPrompts.length + 1}`,
+            content: text.trim(),
+          },
+        ]);
 
-      newPrompts.forEach((prompt) => {
-        const titleMatch = prompt.content.match(/\[Slide Title\]:\s*(.+)/);
-        if (titleMatch) {
-          prompt.title = titleMatch[1].trim();
-        }
-      });
+    newPrompts.forEach((prompt) => {
+      const titleMatch = prompt.content.match(/\[Slide Title\]:\s*(.+)/);
+      if (titleMatch) {
+        prompt.title = titleMatch[1].trim();
+      }
+    });
 
-      setGeneratedPrompts((prev) => [...prev, ...newPrompts]);
-    }
+    setGeneratedPrompts((prev) => [...prev, ...newPrompts]);
   };
 
   const handlePhaseChange = async (newPhase) => {
