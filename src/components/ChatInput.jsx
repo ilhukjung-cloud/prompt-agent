@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-const ChatInput = ({ onSend, disabled, placeholder }) => {
-  const [message, setMessage] = useState('');
+const ChatInput = ({ onSend, disabled, placeholder, value, onChange }) => {
+  const [localMessage, setLocalMessage] = useState('');
   const textareaRef = useRef(null);
+
+  const message = value !== undefined ? value : localMessage;
+  const setMessage = onChange || setLocalMessage;
 
   useEffect(() => {
     if (textareaRef.current) {
