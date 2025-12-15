@@ -56,7 +56,7 @@ const ChatMessage = ({ message, isUser, isStreaming, files }) => {
         <div className="message-text">
           <ReactMarkdown
             components={{
-              code({ node, inline, className, children, ...props }) {
+              code({ inline, children, ...props }) {
                 const code = String(children).replace(/\n$/, '');
                 if (inline) {
                   return <code className="inline-code" {...props}>{children}</code>;

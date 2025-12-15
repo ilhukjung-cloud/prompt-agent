@@ -35,7 +35,7 @@ function App() {
       setIsInitialized(true);
 
       // 첫 메시지로 주제 전송
-      await handleSendMessage(topic, true);
+      await handleSendMessage(topic);
     } catch (err) {
       setError(err.message);
       console.error('Failed to initialize chat:', err);
@@ -91,7 +91,7 @@ function App() {
     }
   };
 
-  const handleSendMessage = async (message, isInit = false) => {
+  const handleSendMessage = async (message) => {
     if (!message.trim()) return;
 
     // 대기 중인 파일이 있으면 함께 전송
