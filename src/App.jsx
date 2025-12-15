@@ -53,6 +53,18 @@ function App() {
   };
 
   // 파일과 함께 메시지 전송
+  const PROMPT_OUTPUT_FORMAT_INSTRUCTION =
+    '프롬프트 생성 시 슬라이드별로 명확한 구분자를 사용해주세요.\n' +
+    '옵션 A (권장):<<<SLIDE 1>>> ... <<<END>>> 형식으로 모든 슬라이드를 감싸세요.\n' +
+    '옵션 B: JSON 배열로 [{ "slideNumber": 1, "title": "...", "prompt": "...", "resolution": "16:9" }, ...] 만을 반환하세요.\n' +
+    '각 슬라이드 프롬프트에는 [Slide Title], [Layout Specification], [Zone A - Header Area], [Zone B - Main Visual Area], [Zone C - Supporting Area], [Text Content - EXACT WORDING], [Visual Style Keywords], [Color Palette] 섹션이 모두 포함되어야 합니다.\n' +
+    '추가 설명 없이 위 출력 형식만 답변하세요.';
+
+  const appendPromptFormatInstruction = (message) => {
+    if (currentPhase !== 'promptGeneration') return message;
+    return `${message}\n\n${PROMPT_OUTPUT_FORMAT_INSTRUCTION}`;
+  };
+
   const handleSendMessageWithFilesInternal = async (message, files) => {
     if (!message.trim() && files.length === 0) return;
 
@@ -72,7 +84,8 @@ function App() {
       let fullResponse = '';
 
       // 히스토리를 직접 전달
-      await sendMessageWithFiles(message, files, messages, (chunk, full) => {
+      const outboundMessage = appendPromptFormatInstruction(message);
+      await sendMessageWithFiles(outboundMessage, files, messages, (chunk, full) => {
         setStreamingMessage(full);
         fullResponse = full;
       });
@@ -112,7 +125,8 @@ function App() {
       let fullResponse = '';
 
       // 히스토리를 직접 전달 (현재 메시지 제외한 이전 히스토리)
-      await sendMessageWithHistory(message, messages, (chunk, full) => {
+      const outboundMessage = appendPromptFormatInstruction(message);
+      await sendMessageWithHistory(outboundMessage, messages, (chunk, full) => {
         setStreamingMessage(full);
         fullResponse = full;
       });
@@ -132,23 +146,115 @@ function App() {
   };
 
   const extractPrompts = (text) => {
-    const codeBlockRegex = /```(?:\w*\n)?([\s\S]*?)```/g;
-    const matches = [...text.matchAll(codeBlockRegex)];
+    const requiredFields = [
+      '[Slide Title]',
+      '[Layout Specification]',
+      '[Zone A - Header Area]',
+      '[Zone B - Main Visual Area]',
+      '[Zone C - Supporting Area]',
+      '[Text Content - EXACT WORDING]',
+      '[Visual Style Keywords]',
+      '[Color Palette]',
+    ];
 
-    if (matches.length > 0) {
-      const newPrompts = matches.map((match, index) => ({
-        title: `Slide ${generatedPrompts.length + index + 1}`,
+    const validatePrompt = (promptContent, index) => {
+      const missingFields = requiredFields.filter((field) => !promptContent.includes(field));
+      if (missingFields.length > 0) {
+        return {
+          isValid: false,
+          message: `Slide ${index + 1} 프롬프트에 ${missingFields.join(', ')} 섹션이 누락되었습니다.`,
+        };
+      }
+      return { isValid: true };
+    };
+
+    const parseDelimitedPrompts = () => {
+      const slideRegex = /<<<SLIDE\s*(\d+)[^>]*>>>([\s\S]*?)(?=(<<<SLIDE\s*\d+[^>]*>>>|<<<END>>>|$))/gi;
+      const slides = [];
+      let match;
+
+      while ((match = slideRegex.exec(text)) !== null) {
+        const slideNumber = parseInt(match[1], 10);
+        const content = match[2].trim();
+        slides.push({
+          title: `Slide ${slideNumber}`,
+          content,
+        });
+      }
+
+      return slides;
+    };
+
+    const parseJsonPrompts = () => {
+      const jsonBlockMatch = text.match(/```json\s*([\s\S]*?)```/i) || text.match(/```\s*([\s\S]*?)```/i);
+      const plainJsonMatch = text.match(/(\[\s*\{[\s\S]*\}\s*\])/);
+      const rawJson = jsonBlockMatch?.[1] || plainJsonMatch?.[1];
+
+      if (!rawJson) return [];
+
+      try {
+        const parsed = JSON.parse(rawJson);
+        if (!Array.isArray(parsed)) return [];
+
+        return parsed
+          .map((slide, index) => {
+            const content = slide.prompt || slide.content || '';
+            return {
+              title: slide.title || slide.slideTitle || `Slide ${slide.slideNumber || index + 1}`,
+              content: content.trim(),
+            };
+          })
+          .filter((slide) => slide.content);
+      } catch (err) {
+        console.error('JSON parsing failed:', err);
+        return [];
+      }
+    };
+
+    const parseCodeBlockPrompts = () => {
+      const codeBlockRegex = /```(?:\w*\n)?([\s\S]*?)```/g;
+      const matches = [...text.matchAll(codeBlockRegex)];
+
+      return matches.map((match) => ({
+        title: 'Slide',
         content: match[1].trim(),
       }));
+    };
 
-      newPrompts.forEach((prompt) => {
-        const titleMatch = prompt.content.match(/\[Slide Title\]:\s*(.+)/);
-        if (titleMatch) {
-          prompt.title = titleMatch[1].trim();
-        }
-      });
+    const parsedPrompts = [parseDelimitedPrompts(), parseJsonPrompts(), parseCodeBlockPrompts()]
+      .find((result) => result.length > 0) || [];
 
-      setGeneratedPrompts((prev) => [...prev, ...newPrompts]);
+    if (parsedPrompts.length === 0) {
+      setError('생성된 프롬프트 형식을 해석할 수 없습니다. SLIDE 구분자 혹은 JSON 배열 형식을 사용해주세요.');
+      return;
+    }
+
+    const validatedPrompts = [];
+    const warnings = [];
+
+    parsedPrompts.forEach((prompt, index) => {
+      const titleMatch = prompt.content.match(/\[Slide Title\]:\s*(.+)/);
+      const title = titleMatch ? titleMatch[1].trim() : prompt.title;
+      const validation = validatePrompt(prompt.content, index);
+
+      if (validation.isValid) {
+        validatedPrompts.push({
+          title,
+          content: prompt.content,
+        });
+      } else if (validation.message) {
+        warnings.push(validation.message);
+      }
+    });
+
+    if (warnings.length > 0) {
+      setError(warnings.join(' '));
+    } else {
+      setError(null);
+    }
+
+    if (validatedPrompts.length > 0) {
+      setGeneratedPrompts((prev) => [...prev, ...validatedPrompts]);
     }
   };
 
@@ -184,9 +290,10 @@ function App() {
     try {
       let fullResponse = '';
       const phaseMessage = `[Phase 전환] 이제 ${phaseNames[newPhase]} 단계입니다. 위의 모든 대화 내용을 바탕으로 ${phaseNames[newPhase]} 단계를 진행해주세요.`;
+      const outboundMessage = appendPromptFormatInstruction(phaseMessage);
 
       // 업데이트된 메시지 히스토리를 직접 전달
-      await sendMessageWithHistory(phaseMessage, updatedMessages, (chunk, full) => {
+      await sendMessageWithHistory(outboundMessage, updatedMessages, (chunk, full) => {
         setStreamingMessage(full);
         fullResponse = full;
       });
