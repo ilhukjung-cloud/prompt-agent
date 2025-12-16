@@ -378,9 +378,9 @@ function App() {
         </div>
 
         {generatedPrompts.length > 0 && (
-          <aside className="sidebar">
+          <section className="prompt-output-section">
             <PromptOutput prompts={generatedPrompts} />
-          </aside>
+          </section>
         )}
       </main>
     </div>
