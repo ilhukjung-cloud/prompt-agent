@@ -90,6 +90,16 @@ subtle shadows, modern typography, strategic consulting aesthetic
 - Risk Red: #DC3545
 \`\`\`
 
+[Image Generation Prompt Guidelines]
+- Follow a two-track deck identity. Pick ONE: **(A) PMO/Meeting deck** for governance, roadmaps, agendas OR **(B) Product/Report deck** for solution intro, capability matrix, report outputs. Do not mix.
+- Mandatory slide blocks: header bar, section headers, tables, timeline/Gantt grid, icon + label blocks, report sample panels (CVE, severity, path, remediation) when relevant.
+- Enforce section headers to anchor layout (e.g., Key Discussion Points, Governance/R&R, Roadmap/Milestones for PMO; Scope & Coverage, Capability Matrix, Workflow/Lifecycle, Report Sample/Output for product/report).
+- Color discipline: blue/gray primary structure and text; Teal/Cyan only for the single main focus; Orange only for secondary highlights (e.g., a metric or milestone). Avoid extra colors.
+- Preferred visual DNA patterns:
+  * Pattern A — enterprise meeting deck: solid blue cover feel, agenda bullets, deliverables/appendix tables, multi-year Gantt timeline with year/quarter grid and vertical regulation milestones, restrained colors (blue/gray).
+  * Pattern B — security product/report deck: 3-stage lifecycle diagram (process→engine→report), capability comparison matrix, numbered vulnerability scope, report mockups with severity badges (Critical/High), CVE/file path/description/remediation, risk category tables.
+- Quality checks for every prompt: 16:9 canvas, clear header hierarchy, named UI blocks (table/timeline/matrix/report panel), exact labels supplied (no invented text), emphasis rule applied (Teal/Cyan main, Orange secondary), flat/clean vector—no photos, no 3D, no clutter.
+
 [IMPORTANT RULES]
 1. NEVER skip details - every element must have exact position, size, color
 2. All text content must be provided VERBATIM - no placeholders
@@ -147,6 +157,7 @@ export const PHASE_PROMPTS = {
 - 폰트 스타일과 크기
 - 아이콘 상세 설명
 - 화살표/연결선 방향과 스타일
+- 첨부된 "Image Generation Prompt Guidelines"의 PMO/Meeting 또는 Product/Report 패턴, 색상 규칙, 섹션 헤더, 필수 UI 블록을 엄격히 준수할 것
 
 프롬프트는 영문으로 작성하되, 슬라이드에 들어갈 한국어 텍스트는 그대로 유지해주세요.`
 };
